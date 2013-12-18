@@ -6,15 +6,20 @@ Compositor {
     id: compositor
     visible: true
 
-    width: 800
-    height: 600
+    width: 1024
+    height: 768
+
+    ApplicationViewer {
+        //height: parent.height
+        model: compositor.model
+    }
 
 
-    ListView {
+    /*ListView {
         anchors.fill: parent
         model: compositor.model
         delegate: WaylandSurfaceItem { surface: model.surface }
-    }
+    }*/
 }
 
 
