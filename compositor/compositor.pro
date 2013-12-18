@@ -10,7 +10,8 @@ SOURCES += \
     compositormodel.cpp
 
 OTHER_FILES += \
-    main.qml
+    main.qml \
+    ApplicationViewer.qml
 
 RESOURCES +=
 
