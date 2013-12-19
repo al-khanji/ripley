@@ -1,31 +1,17 @@
 #ifndef RIPLEYOPENGLCONTEXT_H
 #define RIPLEYOPENGLCONTEXT_H
 
-#include <QtGui/qpa/qplatformopenglcontext.h>
+#include <QtPlatformSupport/private/qeglplatformcontext_p.h>
 
-#define EGL_EGLEXT_PROTOTYPES 1
-#include <EGL/egl.h>
-
-class RipleyWindow;
-
-class RipleyOpenGLContext : public QPlatformOpenGLContext
+class RipleyOpenGLContext : public QEGLPlatformContext
 {
 public:
     explicit RipleyOpenGLContext(QOpenGLContext *context);
-    virtual ~RipleyOpenGLContext();
 
-    bool makeCurrent(QPlatformSurface *surface);
-    void doneCurrent();
-    void swapBuffers(QPlatformSurface *surface);
-    void (*getProcAddress(const QByteArray &procName)) ();
+    virtual void swapBuffers(QPlatformSurface *surface);
 
-    bool isValid() const;
-
-    QSurfaceFormat format() const;
-
-private:
-    EGLContext m_eglContext;
-    QSurfaceFormat m_format;
+protected:
+    virtual EGLSurface eglSurfaceForPlatformSurface(QPlatformSurface *surface);
 };
 
 #endif // RIPLEYOPENGLCONTEXT_H

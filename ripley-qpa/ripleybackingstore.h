@@ -10,7 +10,6 @@ class RipleyBackingStore : public QPlatformBackingStore
 public:
     explicit RipleyBackingStore(QWindow *window);
 
-    void beginPaint(const QRegion &r);
     virtual QPaintDevice *paintDevice();
 
     virtual void flush(QWindow *window, const QRegion &region, const QPoint &offset);
@@ -18,7 +17,6 @@ public:
 
 private:
     QImage m_image;
-    QRegion m_dirty;
 };
 
 #endif // RIPLEYBACKINGSTORE_H

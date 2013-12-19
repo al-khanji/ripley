@@ -2,6 +2,7 @@
 #define RIPLEYHELPERS_H
 
 #include <QtGui/QSurfaceFormat>
+#include <gbm.h>
 
 inline QSurfaceFormat tweakSurfaceFormat(const QSurfaceFormat &format)
 {

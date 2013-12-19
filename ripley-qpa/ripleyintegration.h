@@ -12,6 +12,7 @@ class RipleyWindow;
 #include <xf86drmMode.h>
 #include <gbm.h>
 
+class RipleyScreen;
 class RipleyIntegration : public QObject, public QPlatformIntegration
 {
 public:
@@ -31,13 +32,7 @@ public:
 
     virtual QAbstractEventDispatcher *createEventDispatcher() const;
 
-    void addScreen(uint32_t crtc,
-                   uint32_t connector,
-                   drmModeModeInfo mode,
-                   QRect geometry,
-                   uint32_t depth,
-                   QImage::Format format,
-                   QSize physicalSize);
+    void addScreen(RipleyScreen *screen);
 
     static RipleyIntegration *instance() {
         return m_instance;
@@ -47,7 +42,10 @@ public:
         return m_device.data();
     }
 
-    void swapBuffers(gbm_surface *surface);
+    void setupFrameBuffers(RipleyWindow *rw);
+    void swapBuffers(RipleyWindow *rw);
+
+    void destroyBufferObject(gbm_bo *bo);
 
 public slots:
     void deviceDetected(const QString &deviceNode);
@@ -61,6 +59,9 @@ private:
     QRegion m_geometry;
     QList<RipleyScreen*> m_screens;
     QList<RipleyWindow*> m_windows;
+
+    gbm_bo *current_bo;
+    gbm_bo *next_bo;
 };
 
 #endif // RIPLEYINTEGRATION_H

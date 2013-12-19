@@ -2,11 +2,20 @@
 #include "ripleyintegration.h"
 #include "ripleyscreen.h"
 
+#include <xf86drm.h>
+
 RipleyDevice::RipleyDevice(int fd, QObject *parent)
     : QObject(parent)
     , m_fd(fd)
+    , m_notifier(new QSocketNotifier(m_fd, QSocketNotifier::Read, this))
 {
+    connect(m_notifier, SIGNAL(activated(int)), SLOT(socketNotified()));
+    m_notifier->setEnabled(true);
+
     m_gbmDevice = gbm_create_device(m_fd);
+    if (!m_gbmDevice)
+        qFatal("Could not create gbm device");
+
     m_eglDisplay = eglGetDisplay(m_gbmDevice);
 
     if (m_eglDisplay == EGL_NO_DISPLAY) {
@@ -21,16 +30,16 @@ RipleyDevice::RipleyDevice(int fd, QObject *parent)
         qFatal("EGL error");
     }
 
-    EGLContext ctx;
+//    EGLContext ctx;
 
-    EGLBoolean ok = eglBindAPI(EGL_OPENGL_ES_API);
-    if (!ok)
-        qWarning("Could not bind API!");
+//    EGLBoolean ok = eglBindAPI(EGL_OPENGL_ES_API);
+//    if (!ok)
+//        qWarning("Could not bind API!");
 
-    ctx = eglCreateContext(m_eglDisplay, NULL, EGL_NO_CONTEXT, NULL);
-    ok = eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx);
-    if (!ok)
-        qWarning("Could not bind null surface on startup!");
+//    ctx = eglCreateContext(m_eglDisplay, NULL, EGL_NO_CONTEXT, NULL);
+//    ok = eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx);
+//    if (!ok)
+//        qWarning("Could not bind null surface on startup!");
 }
 
 RipleyDevice::~RipleyDevice()
@@ -97,7 +106,6 @@ void RipleyDevice::checkConnector(drmModeResPtr res,
 
             drmModeFreeEncoder(encoder);
         }
-
     }
 }
 
@@ -112,8 +120,6 @@ static drmModeModeInfo builtin_1024x768 = {
     "1024x768"
 };
 
-#include <QDebug>
-
 void RipleyDevice::addScreen(drmModeConnectorPtr connector, drmModeEncoderPtr encoder, drmModeCrtcPtr crtc)
 {
     drmModeModeInfoPtr mode = 0;
@@ -123,13 +129,16 @@ void RipleyDevice::addScreen(drmModeConnectorPtr connector, drmModeEncoderPtr en
             break;
         }
     }
-    if (!mode)
+    if (!mode) {
+        qDebug("Using fallback mode");
         mode = &builtin_1024x768;
+    }
 
     m_encoders.append(encoder->encoder_id);
     m_crtcs.append(crtc->crtc_id);
 
     uint32_t crtc_id = crtc->crtc_id;
+    uint32_t encoder_id = encoder->encoder_id;
     uint32_t connector_id = connector->connector_id;
     drmModeModeInfo newMode = *mode;
     QRect geometry(0, 0, mode->hdisplay, mode->vdisplay);
@@ -137,12 +146,36 @@ void RipleyDevice::addScreen(drmModeConnectorPtr connector, drmModeEncoderPtr en
     QImage::Format format = QImage::Format_RGB32;
     QSize physicalSize(connector->mmWidth, connector->mmHeight);
 
-    RipleyIntegration::instance()->addScreen(crtc_id, connector_id, newMode, geometry, depth, format, physicalSize);
+    RipleyScreen *screen = new RipleyScreen(crtc_id, encoder_id, connector_id, newMode, geometry, depth, format, physicalSize);
+    RipleyIntegration::instance()->addScreen(screen);
+}
 
-    //    gbm_surface *surface = gbm_surface_create(m_gbmDevice,
-    //                                              mode->hdisplay, mode->vdisplay,
-    //                                              GBM_BO_FORMAT_XRGB8888,
-    //                                              GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+void vblank_handler(int fd,
+                    unsigned int sequence,
+                    unsigned int tv_sec,
+                    unsigned int tv_usec,
+                    void *user_data)
+{
+    qDebug("vblank handler");
+}
 
+void page_flip_handler(int fd,
+                       unsigned int sequence,
+                       unsigned int tv_sec,
+                       unsigned int tv_usec,
+                       void *user_data)
+{
+    qDebug("page flip handler");
+}
 
+void RipleyDevice::socketNotified()
+{
+    drmEventContext ctx = {
+        DRM_EVENT_CONTEXT_VERSION,
+        vblank_handler,
+        page_flip_handler
+    };
+
+    drmHandleEvent(m_fd, &ctx);
+    m_notifier->setEnabled(true);
 }

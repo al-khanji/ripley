@@ -2,6 +2,7 @@
 #define RIPLEYDEVICE_H
 
 #include <QObject>
+#include <QSocketNotifier>
 
 #include <xf86drmMode.h>
 
@@ -35,8 +36,13 @@ public:
     void addScreen(drmModeConnectorPtr connector,
                    drmModeEncoderPtr encoder,
                    drmModeCrtcPtr crtc);
+
+private slots:
+    void socketNotified();
+
 private:
     int m_fd;
+    QSocketNotifier *m_notifier;
 
     EGLDisplay m_eglDisplay;
     EGLContext m_eglContext;

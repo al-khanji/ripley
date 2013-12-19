@@ -11,6 +11,9 @@
 #include <QtPlatformSupport/private/qgenericunixeventdispatcher_p.h>
 #include <QtPlatformSupport/private/qgenericunixfontdatabase_p.h>
 
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
 RipleyIntegration *RipleyIntegration::m_instance = 0;
 
 RipleyIntegration *RipleyIntegration::create()
@@ -50,6 +53,8 @@ RipleyIntegration *RipleyIntegration::create()
 RipleyIntegration::RipleyIntegration(int fd)
     : QPlatformIntegration()
     , m_device(new RipleyDevice(fd, this))
+    , current_bo(0)
+    , next_bo(0)
 {
     Q_ASSERT(!m_instance);
     m_instance = this;
@@ -87,47 +92,62 @@ QAbstractEventDispatcher *RipleyIntegration::createEventDispatcher() const
     return createUnixEventDispatcher();
 }
 
-void RipleyIntegration::addScreen(uint32_t crtc,
-                                  uint32_t connector,
-                                  drmModeModeInfo mode,
-                                  QRect geometry,
-                                  uint32_t depth,
-                                  QImage::Format format,
-                                  QSize physicalSize)
+void RipleyIntegration::addScreen(RipleyScreen *screen)
 {
-    static int x = 0;
+    qDebug("INTEGRATION ADD SCREEN");
 
-    geometry.setX(x);
+    static int x = 0;
+    QRect geometry = screen->geometry();
+
+    geometry.translate(x, 0);
     x += geometry.width();
+    screen->setGeometry(geometry);
+
     m_geometry += geometry;
 
     foreach (RipleyWindow *window, m_windows)
         window->setGeometry(m_geometry.boundingRect());
 
-    qDebug() << "Found a connector of size" << geometry << physicalSize;
-
-    RipleyScreen *rs = new RipleyScreen(crtc, connector, mode, geometry, depth, format, physicalSize);
-    m_screens.append(rs);
-    screenAdded(rs);
+    m_screens.append(screen);
+    screenAdded(screen);
 }
 
-void RipleyIntegration::swapBuffers(gbm_surface *surface)
+static void bo_destroy_user_data(struct gbm_bo *bo, void *)
 {
-qDebug("SWAPPING BUFFERS");
+    RipleyIntegration::instance()->destroyBufferObject(bo);
+}
 
-    gbm_bo *locked = gbm_surface_lock_front_buffer(surface);
-    if (!locked) {
-        qDebug("Could not lock surface front buffer");
-        return;
-    }
-
-    uint32_t handle = gbm_bo_get_handle(locked).u32;
-    uint32_t stride = gbm_bo_get_stride(locked);
+void RipleyIntegration::setupFrameBuffers(RipleyWindow *rw)
+{
+    current_bo = gbm_surface_lock_front_buffer(rw->gbmSurface());
+    if (!current_bo)
+        qFatal("Could not lock front buffer");
 
     foreach (RipleyScreen *rs, m_screens)
-        rs->setupCrtc(handle, stride);
+        rs->setupCrtc(current_bo);
 
-    gbm_surface_release_buffer(surface, locked);
+    gbm_bo_set_user_data(current_bo, (void *)rw, bo_destroy_user_data);
+}
+
+void RipleyIntegration::swapBuffers(RipleyWindow *rw)
+{
+    next_bo = gbm_surface_lock_front_buffer(rw->gbmSurface());
+    foreach (RipleyScreen *rs, m_screens)
+        rs->swapBuffers(next_bo);
+
+    gbm_bo_set_user_data(next_bo, (void *)rw, bo_destroy_user_data);
+
+    gbm_surface_release_buffer(rw->gbmSurface(), current_bo);
+    current_bo = next_bo;
+    next_bo = 0;
+    if (!gbm_surface_has_free_buffers(rw->gbmSurface()))
+        qFatal("NO FREE BUFFERS");
+}
+
+void RipleyIntegration::destroyBufferObject(gbm_bo *bo)
+{
+    foreach (RipleyScreen *screen, m_screens)
+        screen->destroyBufferObject(bo);
 }
 
 void RipleyIntegration::deviceDetected(const QString &deviceNode)
@@ -152,8 +172,12 @@ QPlatformBackingStore *RipleyIntegration::createPlatformBackingStore(QWindow *wi
 
 QPlatformWindow *RipleyIntegration::createPlatformWindow(QWindow *window) const
 {
+    qDebug("RipleyIntegration::createPlatformWindow");
     RipleyWindow *w = new RipleyWindow(window);
     w->setGeometry(m_geometry.boundingRect());
-    const_cast<RipleyIntegration *>(this)->m_windows.append(w);
+
+    RipleyIntegration *that = const_cast<RipleyIntegration *>(this);
+    that->m_windows.append(w);
+
     return w;
 }
