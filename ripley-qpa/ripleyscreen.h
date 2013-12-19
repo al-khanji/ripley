@@ -20,6 +20,7 @@ public:
     virtual QImage::Format format() const;
     virtual QSizeF physicalSize() const;
 
+    void setupCrtc(uint32_t handle, uint32_t stride);
 
 private:
     uint32_t m_crtc;
@@ -29,6 +30,8 @@ private:
     uint32_t m_depth;
     QImage::Format m_format;
     QSize m_physicalSize;
+
+    uint32_t m_bufId;
 };
 
 #endif // RIPLEYSCREEN_H

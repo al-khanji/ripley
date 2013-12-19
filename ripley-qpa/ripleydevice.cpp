@@ -21,18 +21,22 @@ RipleyDevice::RipleyDevice(int fd, QObject *parent)
         qFatal("EGL error");
     }
 
-    scanConnectors();
+    EGLContext ctx;
+
+    EGLBoolean ok = eglBindAPI(EGL_OPENGL_ES_API);
+    if (!ok)
+        qWarning("Could not bind API!");
+
+    ctx = eglCreateContext(m_eglDisplay, NULL, EGL_NO_CONTEXT, NULL);
+    ok = eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx);
+    if (!ok)
+        qWarning("Could not bind null surface on startup!");
 }
 
 RipleyDevice::~RipleyDevice()
 {
     eglTerminate(m_eglDisplay);
     gbm_device_destroy(m_gbmDevice);
-}
-
-EGLDisplay RipleyDevice::eglDisplay() const
-{
-    return m_eglDisplay;
 }
 
 void RipleyDevice::scanConnectors()

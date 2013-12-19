@@ -22,7 +22,12 @@ public:
     int fd() const {
         return m_fd;
     }
-    EGLDisplay eglDisplay() const;
+    EGLDisplay eglDisplay() const {
+        return m_eglDisplay;
+    }
+    gbm_device *gbmDevice() const {
+        return m_gbmDevice;
+    }
 
     void scanConnectors();
     void checkConnector(drmModeResPtr res,

@@ -2,6 +2,7 @@
 #include "ripleyopenglcontext.h"
 #include "ripleydevice.h"
 #include "ripleywindow.h"
+#include "ripleyhelpers.h"
 
 #include <QtGui/QOpenGLContext>
 #include <QtPlatformSupport/private/qeglconvenience_p.h>
@@ -12,22 +13,27 @@ RipleyOpenGLContext::RipleyOpenGLContext(QOpenGLContext *context)
     : QPlatformOpenGLContext()
 {
     EGLDisplay display = RipleyIntegration::instance()->device()->eglDisplay();
-    EGLConfig config = q_configFromGLFormat(display, context->format(), true);
-    m_format = q_glFormatFromConfig(display, config);
+    EGLConfig config = q_configFromGLFormat(display, tweakSurfaceFormat(context->format()), true);
 
-    //Initialize EGLContext
     static EGLint contextAttribs[] = {
         EGL_CONTEXT_CLIENT_VERSION, context->format().majorVersion(),
         EGL_NONE
     };
 
-    eglBindAPI(EGL_OPENGL_ES_API);
+    m_format = q_glFormatFromConfig(display, config);
     m_eglContext = eglCreateContext(display, config, 0, contextAttribs);
-    if (m_eglContext == EGL_NO_CONTEXT) {
-        qWarning("QKmsContext::QKmsContext(): eglError: %x, this: %p",
+
+    if (m_eglContext == EGL_NO_CONTEXT)
+        qWarning("RipleyOpenGLContext::RipleyOpenGLContext(): eglError: %x, this: %p",
                  eglGetError(), this);
-        m_eglContext = 0;
-    }
+}
+
+RipleyOpenGLContext::~RipleyOpenGLContext()
+{
+    EGLDisplay display = RipleyIntegration::instance()->device()->eglDisplay();
+
+    if (m_eglContext != EGL_NO_CONTEXT)
+        eglDestroyContext(display, m_eglContext);
 }
 
 bool RipleyOpenGLContext::isValid() const
@@ -37,26 +43,23 @@ bool RipleyOpenGLContext::isValid() const
 
 bool RipleyOpenGLContext::makeCurrent(QPlatformSurface *surface)
 {
+    RipleyWindow *rw = static_cast<RipleyWindow *>(surface);
+
     EGLDisplay display = RipleyIntegration::instance()->device()->eglDisplay();
-
-    QPlatformWindow *window = static_cast<QPlatformWindow *>(surface);
-    RipleyWindow *rwindow = static_cast<RipleyWindow *>(window);
-
-    EGLSurface eglSurface = rwindow->eglSurface();
+    EGLSurface eglSurface = rw->eglSurface();
     bool ok = eglMakeCurrent(display, eglSurface, eglSurface, m_eglContext);
 
     if (!ok)
         qWarning("RipleyOpenGLContext::makeCurrent(): eglError: %x, this: %p",
                  eglGetError(), this);
 
-    return true;
+    return ok;
 }
 
 void RipleyOpenGLContext::doneCurrent()
 {
     bool ok = eglMakeCurrent(RipleyIntegration::instance()->device()->eglDisplay(),
-                             EGL_NO_SURFACE, EGL_NO_SURFACE,
-                             EGL_NO_CONTEXT);
+                             EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     if (!ok)
         qWarning("RipleyOpenGLContext::doneCurrent(): eglError: %x, this: %p",
                  eglGetError(), this);
@@ -65,8 +68,15 @@ void RipleyOpenGLContext::doneCurrent()
 
 void RipleyOpenGLContext::swapBuffers(QPlatformSurface *surface)
 {
-    RipleyWindow *window = static_cast<RipleyWindow *>(surface);
-    window->swapBuffers();
+    Q_ASSERT(surface);
+    RipleyWindow *rw = static_cast<RipleyWindow *>(surface);
+
+    Q_ASSERT(rw);
+    Q_ASSERT(rw->gbmSurface());
+
+    eglSwapBuffers(RipleyIntegration::instance()->device()->eglDisplay(),
+                   rw->eglSurface());
+    RipleyIntegration::instance()->swapBuffers(rw->gbmSurface());
 }
 
 void (*RipleyOpenGLContext::getProcAddress(const QByteArray &procName)) ()
@@ -74,11 +84,6 @@ void (*RipleyOpenGLContext::getProcAddress(const QByteArray &procName)) ()
     return eglGetProcAddress(procName.data());
 }
 
-
-EGLContext RipleyOpenGLContext::eglContext() const
-{
-    return m_eglContext;
-}
 
 QSurfaceFormat RipleyOpenGLContext::format() const
 {

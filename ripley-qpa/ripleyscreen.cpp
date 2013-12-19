@@ -2,8 +2,6 @@
 #include "ripleyintegration.h"
 #include "ripleydevice.h"
 
-#include <xf86drmMode.h>
-
 RipleyScreen::RipleyScreen(uint32_t crtc,
                            uint32_t connector,
                            drmModeModeInfo mode,
@@ -19,16 +17,10 @@ RipleyScreen::RipleyScreen(uint32_t crtc,
     , m_depth(depth)
     , m_format(format)
     , m_physicalSize(physicalSize)
+    , m_bufId(0)
 {
-//    drmModeSetCrtc(RipleyIntegration::instance()->device()->fd(),
-//                   m_crtc,
-//                   RipleyIntegration::instance()->device()->bufferId(),
-//                   m_geometry.x(),
-//                   m_geometry.y(),
-//                   &m_connector,
-//                   1,
-//                   m_mode);
 }
+
 
 QRect RipleyScreen::geometry() const
 {
@@ -48,4 +40,15 @@ QImage::Format RipleyScreen::format() const
 QSizeF RipleyScreen::physicalSize() const
 {
     return m_physicalSize;
+}
+
+void RipleyScreen::setupCrtc(uint32_t handle, uint32_t stride)
+{
+    const int fd = RipleyIntegration::instance()->device()->fd();
+
+    if (m_bufId)
+        drmModeRmFB(fd, m_bufId);
+
+    drmModeAddFB(fd, m_geometry.width(), m_geometry.height(), 24, 32, stride, handle, &m_bufId);
+    drmModeSetCrtc(fd, m_crtc, m_bufId, m_geometry.x(), m_geometry.y(), &m_connector, 1, &m_mode);
 }

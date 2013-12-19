@@ -6,10 +6,13 @@
 #define EGL_EGLEXT_PROTOTYPES 1
 #include <EGL/egl.h>
 
+class RipleyWindow;
+
 class RipleyOpenGLContext : public QPlatformOpenGLContext
 {
 public:
     explicit RipleyOpenGLContext(QOpenGLContext *context);
+    virtual ~RipleyOpenGLContext();
 
     bool makeCurrent(QPlatformSurface *surface);
     void doneCurrent();
@@ -19,8 +22,6 @@ public:
     bool isValid() const;
 
     QSurfaceFormat format() const;
-
-    EGLContext eglContext() const;
 
 private:
     EGLContext m_eglContext;

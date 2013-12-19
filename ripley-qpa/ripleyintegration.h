@@ -5,9 +5,13 @@
 #include <QtGui/qpa/qplatformintegration.h>
 #include <QtGui/QRegion>
 
-#include <xf86drmMode.h>
-
 class RipleyDevice;
+class RipleyScreen;
+class RipleyWindow;
+
+#include <xf86drmMode.h>
+#include <gbm.h>
+
 class RipleyIntegration : public QObject, public QPlatformIntegration
 {
 public:
@@ -43,14 +47,20 @@ public:
         return m_device.data();
     }
 
+    void swapBuffers(gbm_surface *surface);
+
 public slots:
     void deviceDetected(const QString &deviceNode);
     void deviceRemoved(const QString &deviceNode);
+    void deviceChanged(const QString &deviceNode);
 
 private:
     static RipleyIntegration *m_instance;
+
     QScopedPointer<RipleyDevice> m_device;
     QRegion m_geometry;
+    QList<RipleyScreen*> m_screens;
+    QList<RipleyWindow*> m_windows;
 };
 
 #endif // RIPLEYINTEGRATION_H

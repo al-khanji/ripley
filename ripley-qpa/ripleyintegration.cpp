@@ -44,15 +44,19 @@ RipleyIntegration *RipleyIntegration::create()
             ri, &RipleyIntegration::deviceDetected);
     connect(disc, &QDeviceDiscovery::deviceRemoved,
             ri, &RipleyIntegration::deviceRemoved);
+    connect(disc, &QDeviceDiscovery::deviceChanged,
+            ri, &RipleyIntegration::deviceChanged);
     return ri;
 }
 
 RipleyIntegration::RipleyIntegration(int fd)
     : QPlatformIntegration()
-    , m_device(new RipleyDevice(fd))
+    , m_device(new RipleyDevice(fd, this))
 {
     Q_ASSERT(!m_instance);
     m_instance = this;
+
+    m_device->scanConnectors();
 }
 
 RipleyIntegration::~RipleyIntegration()
@@ -99,9 +103,33 @@ void RipleyIntegration::addScreen(uint32_t crtc,
     x += geometry.width();
     m_geometry += geometry;
 
+    foreach (RipleyWindow *window, m_windows)
+        window->setGeometry(m_geometry.boundingRect());
+
     qDebug() << "Found a connector of size" << geometry << physicalSize;
 
-    screenAdded(new RipleyScreen(crtc, connector, mode, geometry, depth, format, physicalSize));
+    RipleyScreen *rs = new RipleyScreen(crtc, connector, mode, geometry, depth, format, physicalSize);
+    m_screens.append(rs);
+    screenAdded(rs);
+}
+
+void RipleyIntegration::swapBuffers(gbm_surface *surface)
+{
+qDebug("SWAPPING BUFFERS");
+
+    gbm_bo *locked = gbm_surface_lock_front_buffer(surface);
+    if (!locked) {
+        qDebug("Could not lock surface front buffer");
+        return;
+    }
+
+    uint32_t handle = gbm_bo_get_handle(locked).u32;
+    uint32_t stride = gbm_bo_get_stride(locked);
+
+    foreach (RipleyScreen *rs, m_screens)
+        rs->setupCrtc(handle, stride);
+
+    gbm_surface_release_buffer(surface, locked);
 }
 
 void RipleyIntegration::deviceDetected(const QString &deviceNode)
@@ -114,6 +142,11 @@ void RipleyIntegration::deviceRemoved(const QString &deviceNode)
     qDebug("DEVICE REMOVED %s", deviceNode.toLocal8Bit().constData());
 }
 
+void RipleyIntegration::deviceChanged(const QString &deviceNode)
+{
+    qDebug("DEVICE CHANGED %s", deviceNode.toLocal8Bit().constData());
+}
+
 QPlatformBackingStore *RipleyIntegration::createPlatformBackingStore(QWindow *window) const
 {
     return new RipleyBackingStore(window);
@@ -121,5 +154,8 @@ QPlatformBackingStore *RipleyIntegration::createPlatformBackingStore(QWindow *wi
 
 QPlatformWindow *RipleyIntegration::createPlatformWindow(QWindow *window) const
 {
-    return new RipleyWindow(window);
+    RipleyWindow *w = new RipleyWindow(window);
+    w->setGeometry(m_geometry.boundingRect());
+    const_cast<RipleyIntegration *>(this)->m_windows.append(w);
+    return w;
 }

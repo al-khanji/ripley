@@ -1,9 +1,17 @@
+#include <QPainter>
+#include <QOpenGLPaintDevice>
 #include <QScreen>
 #include "ripleybackingstore.h"
+#include "ripleywindow.h"
 
 RipleyBackingStore::RipleyBackingStore(QWindow *window)
     : QPlatformBackingStore(window)
 {
+}
+
+void RipleyBackingStore::beginPaint(const QRegion &r)
+{
+    m_dirty |= r;
 }
 
 QPaintDevice *RipleyBackingStore::paintDevice()
@@ -20,5 +28,6 @@ void RipleyBackingStore::flush(QWindow *window, const QRegion &region, const QPo
 
 void RipleyBackingStore::resize(const QSize &size, const QRegion &staticContents)
 {
+    Q_UNUSED(staticContents);
     m_image = QImage(size, QImage::Format_RGB32);
 }

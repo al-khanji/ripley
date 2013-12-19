@@ -29,7 +29,8 @@ HEADERS += \
     ripleybackingstore.h \
     ripleyopenglcontext.h \
     ripleydevice.h \
-    ripleyscreen.h
+    ripleyscreen.h \
+    ripleyhelpers.h
 
 OTHER_FILES += \
     ripley-qpa.json
