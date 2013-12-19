@@ -44,8 +44,6 @@ RipleyIntegration *RipleyIntegration::create()
             ri, &RipleyIntegration::deviceDetected);
     connect(disc, &QDeviceDiscovery::deviceRemoved,
             ri, &RipleyIntegration::deviceRemoved);
-    connect(disc, &QDeviceDiscovery::deviceChanged,
-            ri, &RipleyIntegration::deviceChanged);
     return ri;
 }
 
