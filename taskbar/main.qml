@@ -1,26 +1,17 @@
 import QtQuick 2.1
-import QtQuick.Compositor 1.0
-import Compositor 1.0
-import DesktopEntry 1.0
+import QtQuick.Window 2.1
 import QtQuick.Controls 1.1
-import QtQuick.Controls.Styles 1.1
 import QtQuick.Layouts 1.1
+import QtQuick.Controls.Styles 1.1
+import DesktopEntry 1.0
 
-Compositor {
-    id: compositor
+ApplicationWindow {
+
     visible: true
+    width: 800
+    height: 100
 
-    width: 1024
-    height: 768
-
-    ApplicationViewer { anchors.fill: parent }
-
-    ToolBar {
-
-        anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-
-        width: 120
-
+    toolBar: ToolBar {
         RowLayout {
             anchors.fill: parent
             Repeater {
@@ -63,5 +54,3 @@ Compositor {
         }
     }
 }
-
-
