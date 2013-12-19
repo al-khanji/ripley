@@ -1,0 +1,7 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Calql8r
+Comment=Compute your calql8ions!
+Exec=calql8r
+Icon=calql8r.png
